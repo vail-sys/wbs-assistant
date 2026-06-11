@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WBS Training Assistant</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8f9fa; color: #1a1a2e; height: 100vh; display: flex; flex-direction: column; }
+
+  /* Header */
+  .header { background: #1a1a2e; color: #fff; padding: 14px 20px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+  .header-logo { width: 32px; height: 32px; background: #e94560; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: #fff; flex-shrink: 0; }
+  .header-title { font-size: 16px; font-weight: 600; }
+  .header-sub { font-size: 12px; color: #9ba3b0; margin-top: 1px; }
+  .header-badges { margin-left: auto; display: flex; gap: 6px; }
+  .badge { font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 20px; letter-spacing: .03em; }
+  .badge-en  { background: #1D4ED8; color: #fff; }
+  .badge-pr  { background: #D97706; color: #fff; }
+  .badge-co  { background: #15803D; color: #fff; }
+  .badge-cx  { background: #7C3AED; color: #fff; }
+  .badge-pa  { background: #475569; color: #fff; }
+
+  /* Layout */
+  .body { display: flex; flex: 1; overflow: hidden; }
+
+  /* Sidebar */
+  .sidebar { width: 220px; flex-shrink: 0; background: #fff; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; overflow-y: auto; }
+  .sidebar-section { padding: 12px 14px 4px; font-size: 10px; font-weight: 700; color: #94a3b8; letter-spacing: .08em; text-transform: uppercase; }
+  .sidebar-item { padding: 8px 14px; font-size: 13px; cursor: pointer; border-left: 3px solid transparent; color: #475569; transition: all .15s; }
+  .sidebar-item:hover { background: #f8fafc; color: #1e293b; }
+  .sidebar-item.active { border-left-color: #e94560; background: #fff1f2; color: #9f1239; font-weight: 500; }
+  .sidebar-item .count { float: right; font-size: 11px; color: #94a3b8; }
+  .sidebar-divider { height: 1px; background: #f1f5f9; margin: 6px 0; }
+
+  /* Main chat area */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .chat-area { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+
+  /* Messages */
+  .msg { display: flex; gap: 10px; max-width: 820px; }
+  .msg.user { flex-direction: row-reverse; align-self: flex-end; }
+  .msg-avatar { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; margin-top: 2px; }
+  .msg.model .msg-avatar { background: #1a1a2e; color: #fff; }
+  .msg.user .msg-avatar { background: #e94560; color: #fff; }
+  .msg-bubble { padding: 10px 14px; border-radius: 12px; font-size: 14px; line-height: 1.6; max-width: 680px; }
+  .msg.model .msg-bubble { background: #fff; border: 1px solid #e2e8f0; border-radius: 2px 12px 12px 12px; }
+  .msg.user .msg-bubble { background: #1a1a2e; color: #eaeaea; border-radius: 12px 2px 12px 12px; }
+  .msg-bubble p { margin-bottom: 8px; }
+  .msg-bubble p:last-child { margin-bottom: 0; }
+  .msg-bubble code { background: #f1f5f9; padding: 1px 5px; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 12px; color: #0c447c; }
+  .msg-bubble strong { font-weight: 600; }
+  .msg-bubble ul { margin: 6px 0 6px 18px; }
+  .msg-bubble li { margin-bottom: 4px; }
+  .msg-bubble .wp-chip { display: inline-block; background: #e8f0fe; color: #0c447c; font-family: 'Courier New', monospace; font-size: 11px; padding: 2px 7px; border-radius: 4px; margin: 1px 2px; }
+
+  /* Typing indicator */
+  .typing { display: flex; gap: 4px; align-items: center; padding: 10px 14px; }
+  .typing span { width: 7px; height: 7px; background: #cbd5e1; border-radius: 50%; animation: bounce 1.2s infinite; }
+  .typing span:nth-child(2) { animation-delay: .2s; }
+  .typing span:nth-child(3) { animation-delay: .4s; }
+  @keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-6px)} }
+
+  /* Input area */
+  .input-area { border-top: 1px solid #e2e8f0; background: #fff; padding: 12px 16px; flex-shrink: 0; }
+  .input-row { display: flex; gap: 8px; align-items: flex-end; }
+  .input-box { flex: 1; border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px 14px; font-size: 14px; font-family: inherit; resize: none; outline: none; max-height: 120px; line-height: 1.5; color: #1a1a2e; background: #f8fafc; transition: border-color .15s; }
+  .input-box:focus { border-color: #1a1a2e; background: #fff; }
+  .send-btn { width: 40px; height: 40px; background: #1a1a2e; border: none; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .15s; }
+  .send-btn:hover:not(:disabled) { background: #e94560; }
+  .send-btn:disabled { background: #cbd5e1; cursor: not-allowed; }
+  .send-btn svg { width: 18px; height: 18px; fill: #fff; }
+
+  /* Suggested questions */
+  .suggestions { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 0 10px; }
+  .suggestion { font-size: 12px; padding: 5px 10px; border: 1px solid #e2e8f0; border-radius: 20px; cursor: pointer; color: #475569; background: #fff; transition: all .15s; white-space: nowrap; }
+  .suggestion:hover { border-color: #1a1a2e; color: #1a1a2e; }
+
+  /* Quickref panel */
+  .quickref { width: 260px; flex-shrink: 0; border-left: 1px solid #e2e8f0; background: #fff; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+  .qr-section { font-size: 10px; font-weight: 700; color: #94a3b8; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 6px; }
+  .qr-card { background: #f8fafc; border-radius: 8px; padding: 10px; font-size: 12px; }
+  .qr-card .qr-id { font-family: 'Courier New', monospace; font-size: 11px; color: #0c447c; background: #e8f0fe; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 4px; }
+  .qr-card .qr-label { color: #64748b; }
+  .qr-area { display: flex; align-items: center; gap: 6px; padding: 4px 0; }
+  .qr-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .qr-area-name { font-size: 12px; color: #334155; }
+  .qr-area-code { font-size: 11px; font-family: monospace; color: #64748b; margin-left: auto; }
+
+  /* Welcome screen */
+  .welcome { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; gap: 20px; padding: 40px; text-align: center; }
+  .welcome-icon { width: 64px; height: 64px; background: #1a1a2e; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 28px; }
+  .welcome h2 { font-size: 22px; font-weight: 600; color: #1a1a2e; }
+  .welcome p { font-size: 14px; color: #64748b; max-width: 400px; line-height: 1.6; }
+  .welcome-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 480px; }
+  .welcome-card { padding: 12px 14px; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; cursor: pointer; text-align: left; transition: all .15s; }
+  .welcome-card:hover { border-color: #1a1a2e; background: #f8fafc; }
+  .welcome-card .wc-label { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; }
+  .welcome-card .wc-q { font-size: 13px; color: #1e293b; line-height: 1.4; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-logo">WP</div>
+  <div>
+    <div class="header-title">Work Package Training Assistant</div>
+    <div class="header-sub">400–700 MW Data Center Program · Powered by Gemini</div>
+  </div>
+  <div class="header-badges">
+    <span class="badge badge-en">EWP</span>
+    <span class="badge badge-pr">PWP</span>
+    <span class="badge badge-co">CWP</span>
+    <span class="badge badge-cx">CXP</span>
+    <span class="badge badge-pa">Products</span>
+  </div>
+</div>
+
+<div class="body">
+  <div class="sidebar">
+    <div class="sidebar-section">Browse by type</div>
+    <div class="sidebar-item active" onclick="setFilter('all')">All packages <span class="count">323</span></div>
+    <div class="sidebar-item" onclick="setFilter('ewp')">Engineering (EWP) <span class="count">116</span></div>
+    <div class="sidebar-item" onclick="setFilter('pwp')">Procurement (PWP) <span class="count">29</span></div>
+    <div class="sidebar-item" onclick="setFilter('cwp')">Construction (CWP) <span class="count">74</span></div>
+    <div class="sidebar-item" onclick="setFilter('cxp')">Commissioning (CXP) <span class="count">29</span></div>
+    <div class="sidebar-item" onclick="setFilter('product')">Product Architecture <span class="count">75</span></div>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-section">Browse by area</div>
+    <div class="sidebar-item" onclick="askArea('SDT')">SDT — Site Development</div>
+    <div class="sidebar-item" onclick="askArea('SHL')">SHL — Shell</div>
+    <div class="sidebar-item" onclick="askArea('SST')">SST — Substation</div>
+    <div class="sidebar-item" onclick="askArea('EYD')">EYD — Electrical Yard</div>
+    <div class="sidebar-item" onclick="askArea('MYD')">MYD — Mechanical Yard</div>
+    <div class="sidebar-item" onclick="askArea('DCH')">DCH — Data Center Hall</div>
+    <div class="sidebar-item" onclick="askArea('FSA')">FSA — Facility Support</div>
+    <div class="sidebar-item" onclick="askArea('SEC')">SEC — Security</div>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-section">Quick concepts</div>
+    <div class="sidebar-item" onclick="askConcept('scope family')">Scope family model</div>
+    <div class="sidebar-item" onclick="askConcept('ID structure')">ID structure</div>
+    <div class="sidebar-item" onclick="askConcept('zone logic')">Zone logic (Z0 vs Z1-Z4)</div>
+    <div class="sidebar-item" onclick="askConcept('OFCI CFCI OFOI')">OFCI / CFCI / OFOI</div>
+    <div class="sidebar-item" onclick="askConcept('long-lead')">Long-lead procurement</div>
+    <div class="sidebar-item" onclick="askConcept('IWP constraints')">IWP constraint types</div>
+    <div class="sidebar-item" onclick="askConcept('FIST')">FIST commissioning</div>
+    <div class="sidebar-item" onclick="askConcept('engineering gates 30 60 90 IFC')">30/60/90/IFC gates</div>
+  </div>
+
+  <div class="main">
+    <div class="chat-area" id="chat">
+      <div class="welcome" id="welcome">
+        <div class="welcome-icon">📦</div>
+        <h2>Work Package Training</h2>
+        <p>Ask anything about the program's work packages — how to read IDs, what's in each package type, scope families, procurement designations, commissioning protocols, or specific systems.</p>
+        <div class="welcome-grid">
+          <div class="welcome-card" onclick="sendQuestion('What is the scope family model and how do I use it?')">
+            <div class="wc-label">Concept</div>
+            <div class="wc-q">What is the scope family model?</div>
+          </div>
+          <div class="welcome-card" onclick="sendQuestion('How do I read a work package ID like DCH-CO01-Z1-D30.23?')">
+            <div class="wc-label">ID structure</div>
+            <div class="wc-q">How do I read DCH-CO01-Z1-D30.23?</div>
+          </div>
+          <div class="welcome-card" onclick="sendQuestion('What are all the work packages for the DCH chilled water system (scope family DCH-D30.23)?')">
+            <div class="wc-label">Scope family</div>
+            <div class="wc-q">Show me the full DCH-D30.23 family</div>
+          </div>
+          <div class="welcome-card" onclick="sendQuestion('What is the difference between OFCI, CFCI, and OFOI procurement designations?')">
+            <div class="wc-label">Procurement</div>
+            <div class="wc-q">OFCI vs CFCI vs OFOI — what's the difference?</div>
+          </div>
+          <div class="welcome-card" onclick="sendQuestion('Walk me through the commissioning sequence for a data center hall zone — what are PFC, FPT, IST and FIST?')">
+            <div class="wc-label">Commissioning</div>
+            <div class="wc-q">Walk me through PFC → FPT → IST → FIST</div>
+          </div>
+          <div class="welcome-card" onclick="sendQuestion('What are the engineering gate packages for the EYD generator system and who is responsible for each?')">
+            <div class="wc-label">Engineering gates</div>
+            <div class="wc-q">Who owns the generator EWPs at each gate?</div>
+          </div>
+          <div class="welcome-card" onclick="sendQuestion('What long-lead procurement packages exist on this program and why are they long-lead?')">
+            <div class="wc-label">Long-lead</div>
+            <div class="wc-q">What are the long-lead procurement packages?</div>
+          </div>
+          <div class="welcome-card" onclick="sendQuestion('What constraints must be cleared before releasing an IWP for rack row and UPS installation in Zone 1?')">
+            <div class="wc-label">IWP planning</div>
+            <div class="wc-q">Constraints for rack/UPS installation Zone 1?</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-area">
+      <div class="suggestions" id="suggestions">
+        <span class="suggestion" onclick="sendQuestion('How many work packages does this program have in total?')">Total WP count?</span>
+        <span class="suggestion" onclick="sendQuestion('What does Z0 mean in a work package ID?')">What is Z0?</span>
+        <span class="suggestion" onclick="sendQuestion('What products are used in the EYD generator installation?')">EYD generator products</span>
+        <span class="suggestion" onclick="sendQuestion('What is the path of construction sequence for this program?')">PoC sequence</span>
+        <span class="suggestion" onclick="sendQuestion('Explain the difference between a CWP and an IWP')">CWP vs IWP</span>
+      </div>
+      <div class="input-row">
+        <textarea class="input-box" id="input" placeholder="Ask about any work package, ID, procurement designation, commissioning protocol, or product…" rows="1"
+          onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+        <button class="send-btn" id="send-btn" onclick="submitChat()" title="Send">
+          <svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="quickref">
+    <div>
+      <div class="qr-section">ID anatomy</div>
+      <div class="qr-card">
+        <div class="qr-id">DCH-CO01-Z1-D30.23</div>
+        <div class="qr-label">Area · Phase+Seq · Zone · UF.MF</div>
+      </div>
+      <div class="qr-card" style="margin-top:6px">
+        <div class="qr-id">DCH-EN02-D30.23</div>
+        <div class="qr-label">EN/PR have no zone field</div>
+      </div>
+    </div>
+    <div>
+      <div class="qr-section">Phase codes</div>
+      <div style="font-size:12px; display:flex; flex-direction:column; gap:4px;">
+        <div><span style="background:#1D4ED8;color:#fff;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:600;">EN</span> <span style="color:#475569;margin-left:4px;">Engineering (30/60/90/IFC)</span></div>
+        <div><span style="background:#D97706;color:#fff;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:600;">PR</span> <span style="color:#475569;margin-left:4px;">Procurement</span></div>
+        <div><span style="background:#15803D;color:#fff;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:600;">CO</span> <span style="color:#475569;margin-left:4px;">Construction</span></div>
+        <div><span style="background:#7C3AED;color:#fff;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:600;">CX</span> <span style="color:#475569;margin-left:4px;">Commissioning</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="qr-section">Program areas</div>
+      <div style="display:flex;flex-direction:column;gap:3px;">
+        <div class="qr-area"><div class="qr-dot" style="background:#9fc5e8"></div><span class="qr-area-name">Site Development</span><span class="qr-area-code">SDT</span></div>
+        <div class="qr-area"><div class="qr-dot" style="background:#cc55cc"></div><span class="qr-area-name">Shell</span><span class="qr-area-code">SHL</span></div>
+        <div class="qr-area"><div class="qr-dot" style="background:#d4a800"></div><span class="qr-area-name">Site Substation</span><span class="qr-area-code">SST</span></div>
+        <div class="qr-area"><div class="qr-dot" style="background:#9a37a7"></div><span class="qr-area-name">Electrical Yard</span><span class="qr-area-code">EYD</span></div>
+        <div class="qr-area"><div class="qr-dot" style="background:#bd8767"></div><span class="qr-area-name">Mechanical Yard</span><span class="qr-area-code">MYD</span></div>
+        <div class="qr-area"><div class="qr-dot" style="background:#6aa84f"></div><span class="qr-area-name">Data Center Hall</span><span class="qr-area-code">DCH</span></div>
+        <div class="qr-area"><div class="qr-dot" style="background:#cc0000"></div><span class="qr-area-name">Facility Support</span><span class="qr-area-code">FSA</span></div>
+        <div class="qr-area"><div class="qr-dot" style="background:#6C5CE7"></div><span class="qr-area-name">Site Security</span><span class="qr-area-code">SEC</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="qr-section">Scope family example</div>
+      <div class="qr-card">
+        <div style="font-size:11px;color:#64748b;margin-bottom:6px;">Filter by <span style="font-family:monospace;color:#0c447c;">DCH-D30.23</span> across all tabs:</div>
+        <div style="display:flex;flex-direction:column;gap:3px;font-size:11px;">
+          <div><span style="background:#1D4ED8;color:#fff;padding:1px 5px;border-radius:3px;">EN01–04</span> 4 gate packages</div>
+          <div><span style="background:#D97706;color:#fff;padding:1px 5px;border-radius:3px;">PR01</span> 1 procurement package</div>
+          <div><span style="background:#15803D;color:#fff;padding:1px 5px;border-radius:3px;">CO01</span> 4 zone packages</div>
+          <div><span style="background:#7C3AED;color:#fff;padding:1px 5px;border-radius:3px;">CX01</span> 4 zone packages</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let history = [];
+let loading = false;
+let activeFilter = 'all';
+
+function setFilter(f) {
+  activeFilter = f;
+  document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
+  event.target.classList.add('active');
+  const labels = {all:'all packages',ewp:'Engineering work packages (EWPs)',pwp:'Procurement work packages (PWPs)',cwp:'Construction work packages (CWPs)',cxp:'Commissioning work packages (CXPs)',product:'product architecture'};
+  if (f !== 'all') sendQuestion(`Give me an overview of the ${labels[f]} on this program`);
+}
+
+function askArea(area) {
+  sendQuestion(`What work packages exist for the ${area} area? Give me a complete overview of all phases.`);
+}
+
+function askConcept(concept) {
+  sendQuestion(`Explain ${concept} in the context of this program's work packaging system`);
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitChat(); }
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function sendQuestion(q) {
+  document.getElementById('input').value = q;
+  submitChat();
+}
+
+async function submitChat() {
+  const input = document.getElementById('input');
+  const q = input.value.trim();
+  if (!q || loading) return;
+  
+  const welcome = document.getElementById('welcome');
+  if (welcome) welcome.remove();
+  
+  input.value = '';
+  input.style.height = 'auto';
+  loading = true;
+  document.getElementById('send-btn').disabled = true;
+
+  appendMessage('user', q);
+  history.push({ role: 'user', parts: [{ text: q }] });
+
+  const typingId = appendTyping();
+
+  try {
+    // Calling your secure backend instead of Google directly
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ history: history })
+    });
+    
+    const data = await response.json();
+    removeTyping(typingId);
+    
+    if (data.error) {
+      throw new Error(data.error);
+    }
+    
+    const text = data.text || 'Sorry, I could not generate a response. Please try again.';
+    
+    history.push({ role: 'model', parts: [{ text: text }] });
+    appendMessage('model', text);
+    updateSuggestions(q);
+    
+  } catch(e) {
+    removeTyping(typingId);
+    appendMessage('model', 'Error connecting to server: ' + e.message);
+    history.pop(); 
+  }
+
+  loading = false;
+  document.getElementById('send-btn').disabled = false;
+  document.getElementById('input').focus();
+}
+
+function appendMessage(role, text) {
+  const chat = document.getElementById('chat');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  const initials = role === 'user' ? 'You' : 'WP';
+  div.innerHTML = `
+    <div class="msg-avatar">${initials}</div>
+    <div class="msg-bubble">${formatMessage(text)}</div>`;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function formatMessage(text) {
+  let html = text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+    .replace(/`([^`]+)`/g,'<code>$1</code>')
+    .replace(/^### (.*$)/gm,'<strong>$1</strong>')
+    .replace(/^## (.*$)/gm,'<strong>$1</strong>')
+    .replace(/^- (.*$)/gm,'<li>$1</li>')
+    .replace(/(<li>.*<\/li>)/gs, match => '<ul>' + match + '</ul>');
+  html = html.replace(/\n\n/g,'</p><p>').replace(/\n/g,'<br>');
+  return '<p>' + html + '</p>';
+}
+
+function appendTyping() {
+  const chat = document.getElementById('chat');
+  const id = 'typing-' + Date.now();
+  const div = document.createElement('div');
+  div.className = 'msg model';
+  div.id = id;
+  div.innerHTML = `<div class="msg-avatar">WP</div><div class="msg-bubble"><div class="typing"><span></span><span></span><span></span></div></div>`;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+  return id;
+}
+
+function removeTyping(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+}
+
+function updateSuggestions(lastQ) {
+  const pool = [
+    'What scope families exist for the DCH area?',
+    'What is the FIST and when does it happen?',
+    'Which packages require owner witness testing at the factory?',
+    'What are all the Z0 packages and why are they Z0?',
+    'What is the prerequisite chain for DCH-CX01-Z1-D30.23?',
+    'What products are in the EYD-D50.48 scope family?',
+    'How many IWPs are estimated for the MYD chiller installation?',
+    'What constraints must be cleared before any CO package releases?',
+    'What is the difference between the 30% and 60% EWP for SST?',
+    'Which areas have OFOI packages and why?',
+    'What does the PoC sequence number tell us about construction order?',
+    'What is the Cx agent for the substation commissioning package?',
+  ].filter(s => s.toLowerCase() !== lastQ.toLowerCase());
+  
+  const suggestions = document.getElementById('suggestions');
+  const picks = pool.sort(() => .5 - Math.random()).slice(0,4);
+  suggestions.innerHTML = picks.map(p => `<span class="suggestion" onclick="sendQuestion('${p.replace(/'/g,"\\'")}')">${p}</span>`).join('');
+}
+</script>
+</body>
+</html>
