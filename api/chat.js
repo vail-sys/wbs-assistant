@@ -1,4 +1,4 @@
-const WBS_DATA = require('./data.json');
+const { google } = require('googleapis');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -6,60 +6,59 @@ module.exports = async function handler(req, res) {
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
+  const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
+  // This line fixes Vercel's formatting of the private key
+  const privateKey = (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
   const { history } = req.body;
 
-  if (!apiKey) {
-    return res.status(500).json({ error: 'Server misconfiguration: Missing API Key' });
+  if (!apiKey || !clientEmail || !privateKey) {
+    return res.status(500).json({ error: 'Server misconfiguration: Missing API or Google Credentials' });
   }
 
-  // COMPRESSION: Strip out massive text paragraphs to prevent the Google server from choking
-  const compressedData = WBS_DATA.EWPs ? WBS_DATA.EWPs.map(pkg => {
-    const { "Scope Description": _, "Key Deliverables": __, ...essentialData } = pkg;
-    return essentialData;
-  }) : WBS_DATA;
-
-  const SYSTEM_PROMPT = `You are a Work Packaging training assistant for a 400–700 MW data center construction program. You help users learn the program's AWP work breakdown structure.
-
-## ID Structure
-- EN and PR packages: AREA-PHASEnn-UF.MF (no zone — covers all zones)
-- CO and CX packages: AREA-PHASEnn-ZONE-UF.MF (zone-specific work)
-- Examples: DCH-EN01-D30.23 · DCH-PR01-D30.23 · DCH-CO01-Z1-D30.23 · DCH-CX01-Z1-D30.23
-
-## Scope Family Key
-Format: AREA-UF.MF (e.g. DCH-D30.23). Appears as column A on every tab. Filter by this key to get the complete lifecycle for any scope — all EWPs, the PWP, all CWPs, and all CXPs.
-
-## Phase Types
-- EWP: 4 gates per system — 30% SD, 60% DD, 90% CD, IFC. Program AE owns 30/60%; Local AE owns 90/IFC.
-- PWP: 1 per scope family. Procurement designation, contract vehicle, PO holder, long-lead flag.
-- CWP: Per zone per system. PoC sequence, est. duration, IWP count, constraint categories.
-- CXP: Per zone per system. PFC → FPT → IST → Owner Accept per zone, then campus FIST.
-
-## Procurement Designations
-- CFCI: Contractor Furnished, Contractor Installed — standard subcontract
-- OFCI: Owner Furnished, Contractor Installed — owner holds PO for major equipment (generators, transformers, chillers, UPS, switchgear, racks). Long-lead.
-- OFOI: Owner Furnished, Owner Installed — owner procures and installs (IT equipment, DCIM, security systems)
-
-## Areas
-SDT (Site Development) · SHL (Shell) · SST (Site Substation) · EYD (Electrical Yard) · MYD (Mechanical Yard) · DCH (Data Center Hall) · FSA (Facility Support Area) · SEC (Site Security)
-
-## Zones
-Z0 = campus-wide (all EN and PR packages). Z1–Z4 = per data hall zone (CO and CX packages).
-
-## Long-Lead Items (52–78 week lead times)
-SST transformers and MV switchgear · EYD generators · EYD LV switchgear · MYD chillers · DCH UPS and racks · DCH cooling units · FSA BMS platform · DCH DCIM platform
-
-## Response style
-- Reference specific WP IDs (e.g. DCH-CO01-Z1-D30.23) when relevant
-- For training questions, explain the WHY not just the WHAT
-- Use the knowledge base data below to give precise, data-backed answers
-- Format IDs in code style
-- Keep answers educational and clear
-
-## Complete WBS Knowledge Base (Summary):
-${JSON.stringify(compressedData)}`;
-
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`, {
+    // 1. Log in as the Robot User
+    const auth = new google.auth.JWT(
+      clientEmail,
+      null,
+      privateKey,
+      ['https://www.googleapis.com/auth/spreadsheets.readonly']
+    );
+
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    // 2. Fetch the live data from your specific Google Sheet
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: '1KNzVv_g25Pa_as6cCyQGYOx7FxLSxpxBj9RN0Gadhkw',
+      range: 'A:Z', // Grabs everything on the first tab
+    });
+
+    const rows = response.data.values;
+    if (!rows || rows.length === 0) {
+       return res.status(500).json({ error: 'The Google Sheet is empty or could not be read.' });
+    }
+
+    // 3. Convert the spreadsheet rows into a format the AI understands
+    const headers = rows[0];
+    const sheetData = rows.slice(1).map(row => {
+      let rowData = {};
+      headers.forEach((header, index) => {
+        rowData[header] = row[index] || ""; 
+      });
+      return rowData;
+    });
+
+    // 4. Feed the live data into the AI
+    const SYSTEM_PROMPT = `You are a Work Packaging training assistant for a 400–700 MW data center construction program. You help users learn the program's AWP work breakdown structure.
+
+## Rules
+- Use the knowledge base data below to give precise, data-backed answers.
+- For training questions, explain the WHY not just the WHAT.
+- Format IDs in code style.
+
+## Complete Live WBS Knowledge Base:
+${JSON.stringify(sheetData)}`;
+
+    const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -69,17 +68,17 @@ ${JSON.stringify(compressedData)}`;
       })
     });
 
-    const data = await response.json();
+    const aiData = await aiResponse.json();
 
-    if (data.error) {
-      return res.status(500).json({ error: data.error.message });
+    if (aiData.error) {
+      return res.status(500).json({ error: aiData.error.message });
     }
 
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I could not generate a response. Please try again.';
-    
+    const text = aiData.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I could not generate a response. Please try again.';
     return res.status(200).json({ text });
 
   } catch (error) {
-    return res.status(500).json({ error: 'Failed to communicate with Gemini.' });
+    console.error(error);
+    return res.status(500).json({ error: 'Server crashed while trying to read the Google Sheet.' });
   }
 };
