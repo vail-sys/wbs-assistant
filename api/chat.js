@@ -1,3 +1,5 @@
+const WBS_DATA = require('./data.json');
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
@@ -10,20 +12,42 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ error: 'Server misconfiguration: Missing API Key' });
   }
 
-  // A shortened, safe version of your data so the server doesn't crash
-  const WBS_DATA = {
-    "EWPs": [
-      {
-        "Scope Family": "SDT-G10.31", 
-        "WP ID": "SDT-EN01-G10.31", 
-        "WP Name": "Earthwork & SWPPP engineering — 30%", 
-        "Area": "SDT", 
-        "Scope Description": "Schematic design (30%) for Earthwork & SWPPP engineering."
-      }
-    ]
-  };
-
   const SYSTEM_PROMPT = `You are a Work Packaging training assistant for a 400–700 MW data center construction program. You help users learn the program's AWP work breakdown structure.
+
+## ID Structure
+- EN and PR packages: AREA-PHASEnn-UF.MF (no zone — covers all zones)
+- CO and CX packages: AREA-PHASEnn-ZONE-UF.MF (zone-specific work)
+- Examples: DCH-EN01-D30.23 · DCH-PR01-D30.23 · DCH-CO01-Z1-D30.23 · DCH-CX01-Z1-D30.23
+
+## Scope Family Key
+Format: AREA-UF.MF (e.g. DCH-D30.23). Appears as column A on every tab. Filter by this key to get the complete lifecycle for any scope — all EWPs, the PWP, all CWPs, and all CXPs.
+
+## Phase Types
+- EWP: 4 gates per system — 30% SD, 60% DD, 90% CD, IFC. Program AE owns 30/60%; Local AE owns 90/IFC.
+- PWP: 1 per scope family. Procurement designation, contract vehicle, PO holder, long-lead flag.
+- CWP: Per zone per system. PoC sequence, est. duration, IWP count, constraint categories.
+- CXP: Per zone per system. PFC → FPT → IST → Owner Accept per zone, then campus FIST.
+
+## Procurement Designations
+- CFCI: Contractor Furnished, Contractor Installed — standard subcontract
+- OFCI: Owner Furnished, Contractor Installed — owner holds PO for major equipment (generators, transformers, chillers, UPS, switchgear, racks). Long-lead.
+- OFOI: Owner Furnished, Owner Installed — owner procures and installs (IT equipment, DCIM, security systems)
+
+## Areas
+SDT (Site Development) · SHL (Shell) · SST (Site Substation) · EYD (Electrical Yard) · MYD (Mechanical Yard) · DCH (Data Center Hall) · FSA (Facility Support Area) · SEC (Site Security)
+
+## Zones
+Z0 = campus-wide (all EN and PR packages). Z1–Z4 = per data hall zone (CO and CX packages).
+
+## Long-Lead Items (52–78 week lead times)
+SST transformers and MV switchgear · EYD generators · EYD LV switchgear · MYD chillers · DCH UPS and racks · DCH cooling units · FSA BMS platform · DCH DCIM platform
+
+## Response style
+- Reference specific WP IDs (e.g. DCH-CO01-Z1-D30.23) when relevant
+- For training questions, explain the WHY not just the WHAT
+- Use the knowledge base data below to give precise, data-backed answers
+- Format IDs in code style
+- Keep answers educational and clear
 
 ## Complete WBS Knowledge Base (Summary):
 ${JSON.stringify(WBS_DATA)}`;
@@ -52,4 +76,4 @@ ${JSON.stringify(WBS_DATA)}`;
   } catch (error) {
     return res.status(500).json({ error: 'Failed to communicate with Gemini.' });
   }
-}
+};
