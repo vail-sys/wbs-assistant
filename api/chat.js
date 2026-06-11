@@ -50,7 +50,7 @@ SST transformers and MV switchgear · EYD generators · EYD LV switchgear · MYD
 - Keep answers educational and clear
 
 ## Complete WBS Knowledge Base (Summary):
-${JSON.stringify(WBS_DATA)}`;
+TESTING`;
 
   try {
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
