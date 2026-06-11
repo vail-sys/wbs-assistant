@@ -12,6 +12,12 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ error: 'Server misconfiguration: Missing API Key' });
   }
 
+  // COMPRESSION: Strip out massive text paragraphs to prevent the Google server from choking
+  const compressedData = WBS_DATA.EWPs ? WBS_DATA.EWPs.map(pkg => {
+    const { "Scope Description": _, "Key Deliverables": __, ...essentialData } = pkg;
+    return essentialData;
+  }) : WBS_DATA;
+
   const SYSTEM_PROMPT = `You are a Work Packaging training assistant for a 400–700 MW data center construction program. You help users learn the program's AWP work breakdown structure.
 
 ## ID Structure
@@ -50,7 +56,7 @@ SST transformers and MV switchgear · EYD generators · EYD LV switchgear · MYD
 - Keep answers educational and clear
 
 ## Complete WBS Knowledge Base (Summary):
-TESTING`;
+${JSON.stringify(compressedData)}`;
 
   try {
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
